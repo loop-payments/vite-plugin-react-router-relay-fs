@@ -1,0 +1,44 @@
+{
+  "name": "@loop-payments/vite-plugin-react-router-relay-fs",
+  "version": "0.0.1",
+  "description": "FS based route definitions for react-router",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p build.tsconfig.json"
+  },
+  "author": "engineering@loop.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loop-payments/vite-plugin-react-router-relay-fs.git"
+  },
+  "keywords": [
+    "relay",
+    "react-router"
+  ],
+  "bugs": {
+    "url": "https://github.com/loop-payments/vite-plugin-react-router-relay-fs/issues"
+  },
+  "homepage": "https://github.com/loop-payments/vite-plugin-react-router-relay-fs#readme",
+  "peerDependencies": {
+    "react-router-dom": ">=6.4.0"
+  },
+  "packageManager": "yarn@4.7.0",
+  "devDependencies": {
+    "@rollup/pluginutils": "^5.1.4",
+    "@types/estree": "^1.0.7",
+    "@types/node": "^22.13.14",
+    "prettier": "^3.5.3",
+    "react-router-dom": "^7.4.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.4"
+  },
+  "dependencies": {
+    "astring": "^1.9.0"
+  }
+}
