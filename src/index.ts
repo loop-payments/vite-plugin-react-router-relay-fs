@@ -1,6 +1,6 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { readdir } from "fs/promises";
-import { join, relative } from "path";
+import { join, relative, sep as pathSeparator } from "path";
 import { generate } from "astring";
 import { generateRoutesFile } from "./file-generation/generate-routes-file.ts";
 import { FileTree } from "./file-tree.ts";
@@ -60,12 +60,8 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       // Scan all directories and build initial file trees
       for (const [appName, appDir] of Object.entries(options.apps)) {
         this.addWatchFile(appDir);
-        try {
-          const tree = await scanDirectory(appDir, appDir);
-          fileTrees[appName] = tree;
-        } catch (error) {
-          console.error(`Error scanning directory ${appDir}:`, error);
-        }
+        const tree = await scanDirectory(appDir, appDir);
+        fileTrees[appName] = tree;
       }
     },
 
@@ -73,28 +69,92 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       id: string,
       { event }: { event: "create" | "update" | "delete" }
     ) {
-      console.log("watchChange", id, event);
+      // Ignore update events, these don't require updating the file tree or
+      // the generated routes file.
+      if (event === "update") {
+        return;
+      }
+
+      // Ignore changes to non-ts/jsx files
+      if (!/\.(t|j)sx?$/.test(id)) {
+        return;
+      }
+
       const app = Object.entries(options.apps).find(([_, dir]) =>
         id.startsWith(dir)
       );
       if (app != null) {
         const [appName, appDir] = app;
+        // Get the relative path from the app directory
+        const parts = relative(appDir, id).split(pathSeparator);
+
+        let current = fileTrees[appName];
+        let madeChanges = false;
+
         switch (event) {
-          case "create":
-          case "delete":
-            // Rescan the directory TODO: make this more efficient
-            const tree = await scanDirectory(appDir, appDir);
-            fileTrees[appName] = tree;
-            // invalidate the route file
-            const module = server?.moduleGraph.getModuleById(
-              `\0${VIRTUAL_MODULE_ID_PREFIX}${appName}`
-            );
-            if (module != null) {
-              server?.reloadModule(module);
-            } else {
-              console.log("Virtual module not found for app", `${appName}`);
+          case "create": {
+            this.debug(`Adding ${id} to file tree`);
+
+            // Walk the tree and create/update nodes
+            for (let i = 0; i < parts.length - 1; i++) {
+              const part = parts[i];
+              if (!(part in current) || current[part].kind !== "directory") {
+                current[part] = {
+                  kind: "directory",
+                  path: join(appDir, ...parts.slice(0, i + 1)),
+                  name: part,
+                  id: join(...parts.slice(0, i + 1)),
+                  children: {}
+                };
+                madeChanges = true;
+              }
+              current = current[part].children;
+            }
+
+            // Add the file node
+            const fileName = parts.at(-1)!;
+            if (current[fileName] == null) {
+              current[fileName] = {
+                kind: "file",
+                path: id,
+                name: fileName,
+                id: join(...parts)
+              };
+              madeChanges = true;
             }
             break;
+          }
+          case "delete": {
+            this.debug(`Removing ${id} from file tree`);
+
+            // Walk the tree to find and remove the node
+            for (let i = 0; i < parts.length - 1; i++) {
+              const part = parts[i];
+              if (!(part in current) || current[part].kind !== 'directory') {
+                return; // Path not found
+              }
+              current = current[part].children;
+            }
+
+            const fileName = parts.at(-1)!;
+            if (current[fileName] != null) {
+              delete current[fileName];
+              madeChanges = true;
+            }
+            break;
+          }
+        }
+
+        // invalidate the route file
+        if (madeChanges) {
+          const module = server?.moduleGraph.getModuleById(
+            `\0${VIRTUAL_MODULE_ID_PREFIX}${appName}`
+          );
+          if (module != null) {
+            server?.reloadModule(module);
+          } else {
+            this.error(`Virtual module not found for app ${appName}`);
+          }
         }
       }
     },
@@ -110,11 +170,11 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
         return null;
       }
 
-      console.log(`Loading ${id}`);
+      this.debug(`Loading ${id}`);
       const appName = id.slice(RESOLVED_VIRTUAL_MODULE_ID_PREFIX.length);
       const fileTree = fileTrees[appName];
       if (!fileTree) {
-        console.error(`File tree not found for app ${appName}`);
+        this.error(`File tree not found for app ${appName}`);
         return null;
       }
 
@@ -122,7 +182,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       const code = generate(program);
 
       // TODO: Remove
-      console.log(code);
+      this.debug(code);
 
       return {
         code,
