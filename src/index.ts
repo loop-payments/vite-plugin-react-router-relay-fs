@@ -27,8 +27,8 @@ async function scanDirectory(dir: string, basePath: string): Promise<FileTree> {
         id,
         children: await scanDirectory(fullPath, basePath),
       };
-      // Ignore non-js/ts files
-    } else if (/\.(t|j)sx?$/.test(entry.name)) {
+      // Ignore irrelevant files
+    } else if (isRoutableFile(entry.name)) {
       tree[entry.name] = {
         kind: "file",
         path: fullPath,
@@ -75,8 +75,8 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
         return;
       }
 
-      // Ignore changes to non-ts/jsx files
-      if (!/\.(t|j)sx?$/.test(id)) {
+      // Ignore changes to non-routable files
+      if (!isRoutableFile(id)) {
         return;
       }
 
@@ -190,4 +190,13 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       };
     },
   };
+}
+
+/**
+ * We only pay attention to files that will impact the route generation.
+ * Specifically these are only entrypoints. In the future this may also include
+ * a different "redirect" type of file.
+ */
+function isRoutableFile(id: string): boolean {
+  return /\.entrypoint\.(t|j)sx?$/.test(id);
 }
