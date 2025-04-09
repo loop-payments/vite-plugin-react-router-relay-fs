@@ -1,6 +1,6 @@
 # @loop-payments/vite-plugin-react-router-relay-fs
 
-A vite plugin that will take care of generating @loop-payments/react-router-relay compatible routes objects from a directory tree of entrypoint files.
+A vite plugin that will take care of generating [@loop-payments/react-router-relay](https://github.com/loop-payments/react-router-relay) compatible routes objects from a directory tree of entrypoint files.
 
 ## Usage
 
@@ -20,7 +20,7 @@ const config = {
         // Each entry will generate a distinct routes object based on the
         // corresponding directory. Each route tree is importable via a virtual
         // import, ex: "virtual:react-router-relay-fs/myAppName".
-        myAppName: path.resolve(__dirname, 'src/apps/someDirectory'),
+        myAppName: path.resolve(__dirname, 'src/apps/myAppRoutes'),
       },
     }),
   ],
@@ -29,7 +29,7 @@ const config = {
 export default config;
 ```
 
-In your code import the generated routes, preprocess them with @loop-payments/react-router-relay and then use them with a data router.
+In your code import the generated routes, preprocess them with [@loop-payments/react-router-relay](https://github.com/loop-payments/react-router-relay) and then use them with a data router.
 
 ```tsx
 import {
@@ -39,6 +39,8 @@ import {
 import { useMemo, useRef } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { useRelayEnvironment } from "react-relay";
+
+// The path needs to match the app name passed to the plugin's options
 import MY_ROUTES from 'virtual:react-router-relay-fs/myAppName';
 
 export default function MyRouter() {
