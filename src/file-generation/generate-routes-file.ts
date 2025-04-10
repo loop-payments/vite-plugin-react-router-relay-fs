@@ -1,56 +1,20 @@
 import { ImportDeclaration, ObjectExpression, Program } from "estree";
-import { generateRouteObject } from "./generate-route-object.ts";
-import { FileTree } from "../file-tree.ts";
+import { DirectoryNode } from "../route-ast/ast-types.ts";
+import { generateDirectoryRoute } from "./generate-directory-route.ts";
 
-export function generateRoutesFile(fileTree: FileTree): Program {
-  const imports: Array<ImportDeclaration> = [];
-  const routeObjects: Array<ObjectExpression> = [];
-
-  for (const value of Object.values(fileTree)) {
-    const routeInfo = generateRouteObject(value);
-    if (routeInfo != null) {
-      imports.push(...routeInfo.imports);
-      routeObjects.push(routeInfo.route);
-    }
-  }
-
-  // If there are no routes, generate a default error route to aid with debugging.
-  if (routeObjects.length === 0) {
-    routeObjects.push({
-      type: "ObjectExpression",
-      properties: [
-        {
-          type: "Property",
-          key: {
-            type: "Literal",
-            value: "path",
-          },
-          value: {
-            type: "Literal",
-            value: "*",
-          },
-          kind: "init",
-          method: false,
-          shorthand: false,
-          computed: false,
-        },
-        {
-          type: "Property",
-          key: {
-            type: "Literal",
-            value: "element",
-          },
-          value: {
-            type: "Literal",
-            value: `ERROR: No routes are defined.`,
-          },
-          kind: "init",
-          method: false,
-          shorthand: false,
-          computed: false,
-        },
-      ],
-    });
+export function generateRoutesFile(directoryNode: DirectoryNode): Program {
+  let imports: Array<ImportDeclaration>;
+  let route: ObjectExpression;
+  if (
+    directoryNode.children.length === 0 &&
+    directoryNode.index == null &&
+    directoryNode.layout == null
+  ) {
+    // If there are no routes, generate a default error route to aid with debugging.
+    route = generateErrorRoute();
+    imports = [];
+  } else {
+    ({ imports, route } = generateDirectoryRoute(directoryNode));
   }
 
   return {
@@ -66,7 +30,7 @@ export function generateRoutesFile(fileTree: FileTree): Program {
             id: { type: "Identifier", name: "routes" },
             init: {
               type: "ArrayExpression",
-              elements: routeObjects,
+              elements: [route],
             },
           },
         ],
@@ -78,6 +42,44 @@ export function generateRoutesFile(fileTree: FileTree): Program {
           type: "Identifier",
           name: "routes",
         },
+      },
+    ],
+  };
+}
+
+function generateErrorRoute(): ObjectExpression {
+  return {
+    type: "ObjectExpression",
+    properties: [
+      {
+        type: "Property",
+        key: {
+          type: "Literal",
+          value: "path",
+        },
+        value: {
+          type: "Literal",
+          value: "*",
+        },
+        kind: "init",
+        method: false,
+        shorthand: false,
+        computed: false,
+      },
+      {
+        type: "Property",
+        key: {
+          type: "Literal",
+          value: "element",
+        },
+        value: {
+          type: "Literal",
+          value: `ERROR: No routes are defined.`,
+        },
+        kind: "init",
+        method: false,
+        shorthand: false,
+        computed: false,
       },
     ],
   };

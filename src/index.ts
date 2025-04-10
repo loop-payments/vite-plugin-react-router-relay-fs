@@ -4,6 +4,10 @@ import { join, relative, sep as pathSeparator } from "path";
 import { generate } from "astring";
 import { generateRoutesFile } from "./file-generation/generate-routes-file.ts";
 import { FileTree } from "./file-tree.ts";
+import { removeEmptyNodes } from "./route-ast/remove-empty-nodes.ts";
+import { compressRoutes } from "./route-ast/compress-routes.ts";
+import { Program } from "estree";
+import { fileTreeToDirectoryAst } from "./route-ast/file-tree-to-route-ast.ts";
 
 type Options = {
   readonly apps: Record<string, string>;
@@ -67,7 +71,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
 
     async watchChange(
       id: string,
-      { event }: { event: "create" | "update" | "delete" }
+      { event }: { event: "create" | "update" | "delete" },
     ) {
       // Ignore update events, these don't require updating the file tree or
       // the generated routes file.
@@ -81,7 +85,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       }
 
       const app = Object.entries(options.apps).find(([_, dir]) =>
-        id.startsWith(dir)
+        id.startsWith(dir),
       );
       if (app != null) {
         const [appName, appDir] = app;
@@ -104,7 +108,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
                   path: join(appDir, ...parts.slice(0, i + 1)),
                   name: part,
                   id: join(...parts.slice(0, i + 1)),
-                  children: {}
+                  children: {},
                 };
                 madeChanges = true;
               }
@@ -118,7 +122,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
                 kind: "file",
                 path: id,
                 name: fileName,
-                id: join(...parts)
+                id: join(...parts),
               };
               madeChanges = true;
             }
@@ -130,7 +134,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
             // Walk the tree to find and remove the node
             for (let i = 0; i < parts.length - 1; i++) {
               const part = parts[i];
-              if (!(part in current) || current[part].kind !== 'directory') {
+              if (!(part in current) || current[part].kind !== "directory") {
                 return; // Path not found
               }
               current = current[part].children;
@@ -148,7 +152,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
         // invalidate the route file
         if (madeChanges) {
           const module = server?.moduleGraph.getModuleById(
-            `\0${VIRTUAL_MODULE_ID_PREFIX}${appName}`
+            `\0${VIRTUAL_MODULE_ID_PREFIX}${appName}`,
           );
           if (module != null) {
             server?.reloadModule(module);
@@ -178,7 +182,24 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
         return null;
       }
 
-      const program = generateRoutesFile(fileTree);
+      const ast = fileTreeToDirectoryAst(fileTree);
+      this.debug(() => JSON.stringify(ast, null, 2));
+
+      const prunedAst = removeEmptyNodes(ast);
+      let program: Program;
+      if (prunedAst != null) {
+        const compressedAst = compressRoutes(prunedAst);
+        program = generateRoutesFile(compressedAst);
+      } else {
+        program = generateRoutesFile({
+          kind: "directory",
+          path: "",
+          id: "",
+          layout: null,
+          index: null,
+          children: [],
+        });
+      }
       const code = generate(program);
 
       // TODO: Remove
