@@ -8,6 +8,9 @@ import { removeEmptyNodes } from "./route-ast/remove-empty-nodes.ts";
 import { compressRoutes } from "./route-ast/compress-routes.ts";
 import { Program } from "estree";
 import { fileTreeToDirectoryAst } from "./route-ast/file-tree-to-route-ast.ts";
+import { scanDirectoryTree } from "./scan-directory-tree.ts";
+import { isRoutableFile } from "./is-routable-file.ts";
+import { renderRoutesFromFileTree } from "./render-routes-from-file-tree.ts";
 
 type Options = {
   readonly apps: Record<string, string>;
@@ -15,35 +18,6 @@ type Options = {
 
 const VIRTUAL_MODULE_ID_PREFIX = "virtual:react-router-relay-fs/";
 const RESOLVED_VIRTUAL_MODULE_ID_PREFIX = `\0${VIRTUAL_MODULE_ID_PREFIX}`;
-
-async function scanDirectory(dir: string, basePath: string): Promise<FileTree> {
-  const tree: FileTree = {};
-  const entries = await readdir(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    const id = relative(basePath, fullPath);
-    if (entry.isDirectory()) {
-      tree[entry.name] = {
-        kind: "directory",
-        path: fullPath,
-        name: entry.name,
-        id,
-        children: await scanDirectory(fullPath, basePath),
-      };
-      // Ignore irrelevant files
-    } else if (isRoutableFile(entry.name)) {
-      tree[entry.name] = {
-        kind: "file",
-        path: fullPath,
-        name: entry.name,
-        id,
-      };
-    }
-  }
-
-  return tree;
-}
 
 export default function reactRouterRelayFs(options?: Options): Plugin {
   if (options?.apps == null || Object.keys(options.apps).length === 0) {
@@ -64,7 +38,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       // Scan all directories and build initial file trees
       for (const [appName, appDir] of Object.entries(options.apps)) {
         this.addWatchFile(appDir);
-        const tree = await scanDirectory(appDir, appDir);
+        const tree = await scanDirectoryTree(appDir, appDir);
         fileTrees[appName] = tree;
       }
     },
@@ -182,25 +156,7 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
         return null;
       }
 
-      const ast = fileTreeToDirectoryAst(fileTree);
-      this.debug(() => JSON.stringify(ast, null, 2));
-
-      const prunedAst = removeEmptyNodes(ast);
-      let program: Program;
-      if (prunedAst != null) {
-        const compressedAst = compressRoutes(prunedAst);
-        program = generateRoutesFile(compressedAst);
-      } else {
-        program = generateRoutesFile({
-          kind: "directory",
-          path: "",
-          id: "",
-          layout: null,
-          index: null,
-          children: [],
-        });
-      }
-      const code = generate(program);
+      const code = renderRoutesFromFileTree(fileTree);
 
       // TODO: Remove
       this.debug(code);
@@ -211,13 +167,4 @@ export default function reactRouterRelayFs(options?: Options): Plugin {
       };
     },
   };
-}
-
-/**
- * We only pay attention to files that will impact the route generation.
- * Specifically these are only entrypoints. In the future this may also include
- * a different "redirect" type of file.
- */
-function isRoutableFile(id: string): boolean {
-  return /\.entrypoint\.(t|j)sx?$/.test(id);
 }

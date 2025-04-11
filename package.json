@@ -1,11 +1,14 @@
 {
   "name": "@loop-payments/vite-plugin-react-router-relay-fs",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "FS based route definitions for react-router using relay entrypoints",
   "main": "dist/index.js",
   "files": [
     "dist"
   ],
+  "bin": {
+    "write-routes-to-file": "./dist/bin/write-routes-to-file.js"
+  },
   "type": "module",
   "types": "./dist/index.d.ts",
   "scripts": {
