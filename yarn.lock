@@ -217,6 +217,8 @@ __metadata:
     vite: "npm:^6.2.4"
   peerDependencies:
     react-router-dom: ">=6.4.0"
+  bin:
+    write-routes-to-file: ./dist/bin/write-routes-to-file.js
   languageName: unknown
   linkType: soft
 
