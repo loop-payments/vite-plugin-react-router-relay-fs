@@ -12,7 +12,7 @@ jobs:
         with:
           package-manager-cache: false
           node-version: 24
-          registry-url: "https://registry.npmjs.org"
+          registry-url: "https://npm.pkg.github.com"
           scope: "@loop-payments"
       - run: corepack enable
       - run: yarn install --immutable
